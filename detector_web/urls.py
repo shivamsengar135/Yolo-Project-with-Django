@@ -13,4 +13,5 @@ urlpatterns = [
     path("stop/", views.stop_task, name="stop-task"),
     path("status/", views.task_status, name="task-status"),
     path("stream/<str:backend>/", views.stream_detection, name="stream-detection"),
+    path("infer/frame/", views.infer_frame, name="infer-frame"),
 ]

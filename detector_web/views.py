@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import threading
 import time
+from pathlib import Path
 from typing import Any
 
 from django.contrib.auth import login, logout
@@ -14,11 +16,41 @@ from .forms import LoginForm, RegisterForm
 from .runner import DEVICE_CHOICES, runner
 
 SESSION_TIMEOUT_SECONDS = 600
+_YOLO_MODEL = None
+_YOLO_MODEL_PATH = None
+_YOLO_MODEL_LOCK = threading.Lock()
 
 
 def _clean_value(raw: Any, fallback: str) -> str:
     value = str(raw or "").strip()
     return value if value else fallback
+
+
+def _resolve_web_yolo_model(model_arg: str) -> str:
+    project_root = Path(__file__).resolve().parent.parent
+    requested = Path(model_arg)
+    if requested.exists():
+        return str(requested)
+
+    fallbacks = [
+        project_root / "yolo26n.pt",
+        project_root / "yolov8n.pt",
+    ]
+    for candidate in fallbacks:
+        if candidate.exists():
+            return str(candidate)
+    return model_arg
+
+
+def _get_web_yolo_model(model_path: str):
+    global _YOLO_MODEL, _YOLO_MODEL_PATH
+    with _YOLO_MODEL_LOCK:
+        if _YOLO_MODEL is None or _YOLO_MODEL_PATH != model_path:
+            from ultralytics import YOLO
+
+            _YOLO_MODEL = YOLO(model_path)
+            _YOLO_MODEL_PATH = model_path
+        return _YOLO_MODEL
 
 
 @require_GET
@@ -172,3 +204,57 @@ def stream_detection(request: HttpRequest, backend: str) -> HttpResponse:
         stream,
         content_type="multipart/x-mixed-replace; boundary=frame",
     )
+
+
+@csrf_exempt
+@login_required
+@require_POST
+def infer_frame(request: HttpRequest) -> HttpResponse:
+    backend = _clean_value(request.POST.get("backend"), "yolo").lower()
+    if backend != "yolo":
+        return JsonResponse(
+            {
+                "ok": False,
+                "message": "Hosted mode currently supports YOLO backend for browser camera inference.",
+            },
+            status=400,
+        )
+
+    frame_file = request.FILES.get("frame")
+    if frame_file is None:
+        return JsonResponse({"ok": False, "message": "No frame received."}, status=400)
+
+    model_arg = _clean_value(request.POST.get("model"), "yolov8n.pt")
+    model_path = _resolve_web_yolo_model(model_arg)
+    imgsz = int(_clean_value(request.POST.get("imgsz"), "640"))
+    conf = float(_clean_value(request.POST.get("conf"), "0.4"))
+    device = _clean_value(request.POST.get("device"), "cpu")
+    if device.lower() in {"auto", "cuda", "gpu"}:
+        device = "cpu"
+
+    try:
+        import cv2
+        import numpy as np
+
+        raw = frame_file.read()
+        np_arr = np.frombuffer(raw, dtype=np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            return JsonResponse({"ok": False, "message": "Invalid image frame."}, status=400)
+
+        model = _get_web_yolo_model(model_path)
+        results = model.predict(
+            frame,
+            imgsz=imgsz,
+            conf=conf,
+            iou=0.45,
+            device=device,
+            verbose=False,
+        )
+        annotated = results[0].plot()
+        ok, buffer = cv2.imencode(".jpg", annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 82])
+        if not ok:
+            return JsonResponse({"ok": False, "message": "Could not encode frame."}, status=500)
+        return HttpResponse(buffer.tobytes(), content_type="image/jpeg")
+    except Exception as exc:
+        return JsonResponse({"ok": False, "message": str(exc)}, status=500)

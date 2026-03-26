@@ -1,56 +1,152 @@
-function startStream() {
-    const backend = document.getElementById("stream-backend").value;
-    const modelInput = document.getElementById("stream-model");
-    const model = modelInput.value.trim() || "yolov8n.pt";
-    const conf = document.getElementById("stream-conf").value || "0.4";
-    const source = document.getElementById("source").value || "auto";
-    const device = document.getElementById("device").value || "auto";
+let localCameraStream = null;
+let captureVideo = null;
+let captureCanvas = null;
+let captureTimer = null;
+let inferenceBusy = false;
+let currentFrameUrl = null;
+
+function setStatus(text, live = false) {
     const status = document.getElementById("stream-status");
+    if (!status) {
+        return;
+    }
+    status.textContent = text;
+    status.classList.toggle("live", live);
+}
+
+function showEmpty(show) {
     const empty = document.getElementById("stream-empty");
-
-    const params = new URLSearchParams();
-    params.set("model", backend === "ssd" ? "ssd" : model);
-    params.set("imgsz", "640");
-    params.set("conf", conf);
-    params.set("source", source);
-    params.set("device", device);
-    params.set("_t", String(Date.now()));
-
-    const frame = document.getElementById("stream-frame");
-    if (status) {
-        status.textContent = "Connecting...";
-        status.classList.remove("live");
+    if (!empty) {
+        return;
     }
-    if (empty) {
-        empty.style.display = "none";
+    empty.style.display = show ? "block" : "none";
+}
+
+async function startStream() {
+    const backendSelect = document.getElementById("stream-backend");
+    if (backendSelect.value !== "yolo") {
+        alert("Hosted browser-camera mode supports YOLO backend. Switching to YOLO.");
+        backendSelect.value = "yolo";
     }
-    frame.onload = () => {
-        if (status) {
-            status.textContent = "Live";
-            status.classList.add("live");
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Your browser does not support webcam access.");
+        return;
+    }
+
+    stopStream();
+    setStatus("Requesting Camera...");
+
+    try {
+        localCameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" },
+            audio: false,
+        });
+    } catch (error) {
+        setStatus("Camera Permission Denied");
+        showEmpty(true);
+        return;
+    }
+
+    captureVideo = document.createElement("video");
+    captureVideo.srcObject = localCameraStream;
+    captureVideo.autoplay = true;
+    captureVideo.muted = true;
+    captureVideo.playsInline = true;
+    await captureVideo.play();
+
+    captureCanvas = document.createElement("canvas");
+    showEmpty(false);
+    setStatus("Loading Model...");
+    captureTimer = setInterval(captureAndInfer, 900);
+}
+
+async function captureAndInfer() {
+    if (inferenceBusy || !captureVideo || !captureCanvas || !localCameraStream) {
+        return;
+    }
+    if (captureVideo.videoWidth < 2 || captureVideo.videoHeight < 2) {
+        return;
+    }
+
+    inferenceBusy = true;
+    const ctx = captureCanvas.getContext("2d");
+    captureCanvas.width = captureVideo.videoWidth;
+    captureCanvas.height = captureVideo.videoHeight;
+    ctx.drawImage(captureVideo, 0, 0, captureCanvas.width, captureCanvas.height);
+
+    const blob = await new Promise((resolve) => {
+        captureCanvas.toBlob(resolve, "image/jpeg", 0.85);
+    });
+    if (!blob) {
+        inferenceBusy = false;
+        return;
+    }
+
+    const model = (document.getElementById("stream-model").value || "yolov8n.pt").trim();
+    const conf = document.getElementById("stream-conf").value || "0.4";
+    const device = document.getElementById("device").value || "cpu";
+
+    const form = new FormData();
+    form.append("frame", blob, "frame.jpg");
+    form.append("backend", "yolo");
+    form.append("model", model);
+    form.append("conf", conf);
+    form.append("imgsz", "640");
+    form.append("device", device);
+
+    try {
+        const response = await fetch("/infer/frame/", {
+            method: "POST",
+            body: form,
+        });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({ message: "Inference failed." }));
+            setStatus(payload.message || "Inference Error");
+            inferenceBusy = false;
+            return;
         }
-    };
-    frame.onerror = () => {
-        if (status) {
-            status.textContent = "Stream Error";
-            status.classList.remove("live");
+
+        const imgBlob = await response.blob();
+        const frame = document.getElementById("stream-frame");
+        const nextUrl = URL.createObjectURL(imgBlob);
+        frame.src = nextUrl;
+        if (currentFrameUrl) {
+            URL.revokeObjectURL(currentFrameUrl);
         }
-    };
-    frame.src = `/stream/${backend}/?${params.toString()}`;
+        currentFrameUrl = nextUrl;
+        setStatus("Live", true);
+    } catch (error) {
+        setStatus("Network Error");
+    } finally {
+        inferenceBusy = false;
+    }
 }
 
 function stopStream() {
+    if (captureTimer) {
+        clearInterval(captureTimer);
+        captureTimer = null;
+    }
+    if (localCameraStream) {
+        localCameraStream.getTracks().forEach((track) => track.stop());
+        localCameraStream = null;
+    }
+    if (captureVideo) {
+        captureVideo.srcObject = null;
+        captureVideo = null;
+    }
+    captureCanvas = null;
+    inferenceBusy = false;
+
     const frame = document.getElementById("stream-frame");
-    const status = document.getElementById("stream-status");
-    const empty = document.getElementById("stream-empty");
     frame.src = "";
-    if (status) {
-        status.textContent = "Idle";
-        status.classList.remove("live");
+    if (currentFrameUrl) {
+        URL.revokeObjectURL(currentFrameUrl);
+        currentFrameUrl = null;
     }
-    if (empty) {
-        empty.style.display = "block";
-    }
+    setStatus("Idle");
+    showEmpty(true);
 }
 
 function formatRemaining(seconds) {
