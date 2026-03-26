@@ -87,6 +87,34 @@ Web app behavior:
 - After timeout, user is logged out and must login again.
 - Live webcam detection runs inside the same page (`YOLO`, `ONNX`, `SSD`).
 
+## Host on Render (Cloud)
+
+This repo is now deployment-ready for Render with:
+
+- `Procfile`
+- `build.sh`
+- Production-ready Django settings (env-based secret/debug/hosts/static/database)
+
+### Render setup
+
+1. Push this repo to GitHub.
+2. In Render, create a new **Web Service** from this repo.
+3. Use:
+   - Build Command: `./build.sh`
+   - Start Command: `gunicorn detector_site.wsgi --log-file -`
+4. Add environment variables:
+   - `DJANGO_SECRET_KEY` = strong random string
+   - `DJANGO_DEBUG` = `False`
+   - `DJANGO_ALLOWED_HOSTS` = `<your-render-hostname>`
+   - `DJANGO_CSRF_TRUSTED_ORIGINS` = `https://<your-render-hostname>`
+5. Deploy.
+
+### Important note about webcam detection
+
+Cloud hosting does not have access to your local laptop webcam for server-side `cv2.VideoCapture`.
+The current live detection stream works best when running locally on your machine.
+To make hosted detection use end-user webcams, the app must be changed to browser camera capture (`getUserMedia`) and send frames to backend inference endpoints.
+
 ## Build single .exe with custom icon
 
 From project root, run:
