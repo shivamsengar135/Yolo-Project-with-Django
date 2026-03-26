@@ -57,8 +57,8 @@ async function startStream() {
 
     captureCanvas = document.createElement("canvas");
     showEmpty(false);
-    setStatus("Loading Model...");
-    captureTimer = setInterval(captureAndInfer, 900);
+    setStatus("Loading Model (wait a few seconds)...");
+    captureTimer = setInterval(captureAndInfer, 1400);
 }
 
 async function captureAndInfer() {
@@ -92,7 +92,7 @@ async function captureAndInfer() {
     form.append("backend", "yolo");
     form.append("model", model);
     form.append("conf", conf);
-    form.append("imgsz", "640");
+    form.append("imgsz", "320");
     form.append("device", device);
 
     try {

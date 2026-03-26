@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import threading
 import time
 from pathlib import Path
@@ -51,6 +52,15 @@ def _get_web_yolo_model(model_path: str):
             _YOLO_MODEL = YOLO(model_path)
             _YOLO_MODEL_PATH = model_path
         return _YOLO_MODEL
+
+
+def _warmup_default_model() -> None:
+    try:
+        model_path = _resolve_web_yolo_model("yolov8n.pt")
+        _get_web_yolo_model(model_path)
+    except Exception:
+        # Warmup should never crash app startup.
+        pass
 
 
 @require_GET
@@ -226,7 +236,8 @@ def infer_frame(request: HttpRequest) -> HttpResponse:
 
     model_arg = _clean_value(request.POST.get("model"), "yolov8n.pt")
     model_path = _resolve_web_yolo_model(model_arg)
-    imgsz = int(_clean_value(request.POST.get("imgsz"), "640"))
+    imgsz = int(_clean_value(request.POST.get("imgsz"), "320"))
+    imgsz = max(224, min(imgsz, 640))
     conf = float(_clean_value(request.POST.get("conf"), "0.4"))
     device = _clean_value(request.POST.get("device"), "cpu")
     if device.lower() in {"auto", "cuda", "gpu"}:
@@ -242,12 +253,20 @@ def infer_frame(request: HttpRequest) -> HttpResponse:
         if frame is None:
             return JsonResponse({"ok": False, "message": "Invalid image frame."}, status=400)
 
+        # Keep hosted inference lightweight on Render-sized instances.
+        h, w = frame.shape[:2]
+        max_side = max(h, w)
+        if max_side > 640:
+            scale = 640.0 / max_side
+            frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_LINEAR)
+
         model = _get_web_yolo_model(model_path)
         results = model.predict(
             frame,
             imgsz=imgsz,
             conf=conf,
             iou=0.45,
+            max_det=60,
             device=device,
             verbose=False,
         )
@@ -258,3 +277,7 @@ def infer_frame(request: HttpRequest) -> HttpResponse:
         return HttpResponse(buffer.tobytes(), content_type="image/jpeg")
     except Exception as exc:
         return JsonResponse({"ok": False, "message": str(exc)}, status=500)
+
+
+if os.getenv("RENDER_EXTERNAL_HOSTNAME"):
+    threading.Thread(target=_warmup_default_model, daemon=True).start()

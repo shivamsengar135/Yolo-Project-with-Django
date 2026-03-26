@@ -1,1 +1,1 @@
-web: gunicorn detector_site.wsgi --bind 0.0.0.0:${PORT} --workers 1 --threads 2 --timeout 120 --log-file -
+web: gunicorn detector_site.wsgi --bind 0.0.0.0:${PORT} --workers 1 --threads 2 --timeout 300 --log-file -

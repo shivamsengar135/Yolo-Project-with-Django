@@ -101,7 +101,7 @@ This repo is now deployment-ready for Render with:
 2. In Render, create a new **Web Service** from this repo.
 3. Use:
    - Build Command: `./build.sh`
-   - Start Command: `gunicorn detector_site.wsgi --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 --log-file -`
+   - Start Command: `gunicorn detector_site.wsgi --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 300 --log-file -`
 4. Add environment variables:
    - `DJANGO_SECRET_KEY` = strong random string
    - `DJANGO_DEBUG` = `False`
