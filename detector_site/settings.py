@@ -1,7 +1,10 @@
 import os
 from pathlib import Path
 
-import dj_database_url
+try:
+    import dj_database_url
+except ImportError:
+    dj_database_url = None
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -11,11 +14,18 @@ DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in {"1", "true", "yes", "on"}
 
 raw_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [host.strip() for host in raw_hosts.split(",") if host.strip()]
+render_host = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
+if render_host:
+    ALLOWED_HOSTS.append(render_host)
 if not ALLOWED_HOSTS:
     ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
 
 raw_csrf = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in raw_csrf.split(",") if origin.strip()]
+if render_host:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{render_host}")
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -59,13 +69,21 @@ TEMPLATES = [
 WSGI_APPLICATION = "detector_site.wsgi.application"
 ASGI_APPLICATION = "detector_site.asgi.application"
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-        ssl_require=False,
-    )
-}
+if dj_database_url is not None:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+            conn_max_age=600,
+            ssl_require=False,
+        )
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = []
 

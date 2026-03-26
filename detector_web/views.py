@@ -11,7 +11,6 @@ from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
 
 from .forms import LoginForm, RegisterForm
-from .live_stream import live_service
 from .runner import DEVICE_CHOICES, runner
 
 SESSION_TIMEOUT_SECONDS = 600
@@ -40,7 +39,7 @@ def login_view_get(request: HttpRequest) -> HttpResponse:
 def login_view_post(request: HttpRequest) -> HttpResponse:
     form = LoginForm(request, data=request.POST)
     if not form.is_valid():
-        return render(request, "detector_web/login.html", {"form": form}, status=400)
+        return render(request, "detector_web/login.html", {"form": form})
 
     login(request, form.get_user())
     expires_at = int(time.time()) + SESSION_TIMEOUT_SECONDS
@@ -155,6 +154,9 @@ def stream_detection(request: HttpRequest, backend: str) -> HttpResponse:
     conf = float(_clean_value(request.GET.get("conf"), "0.4"))
 
     try:
+        # Lazy import avoids loading heavy inference dependencies for normal page requests.
+        from .live_stream import live_service
+
         stream = live_service.stream(
             backend,
             model=model,
