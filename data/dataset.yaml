@@ -1,0 +1,8 @@
+names:
+  0: bottle
+  1: cup
+  2: cell phone
+path: C:\Users\shiva\Desktop\Training\Coding\Session_13\trial1\data
+test: images/test
+train: .\images\train\
+val: .\images\val\

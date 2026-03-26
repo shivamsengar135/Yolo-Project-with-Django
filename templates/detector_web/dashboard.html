@@ -1,0 +1,100 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edge Object Detection | Dashboard</title>
+    <link rel="stylesheet" href="{% static 'detector_web/style.css' %}">
+</head>
+<body class="app-shell" data-expires-at="{{ expires_at }}">
+    <main class="viewport">
+        <header class="topbar">
+            <div class="brand-block">
+                <p class="brand-name">Edge Object Detection</p>
+                <h1>Real-Time Vision Workspace</h1>
+                <p class="brand-desc">Run live camera detection in-browser with YOLO, ONNX, or SSD. This app can detect objects such as bottle, cup, and cell phone from your trained dataset (and standard COCO objects in SSD mode).</p>
+            </div>
+            <div class="session-tools">
+                <span id="countdown" class="countdown">10:00</span>
+                <a class="logout-link" href="/logout/">Logout</a>
+            </div>
+        </header>
+
+        <section class="workspace">
+            <aside class="left-rail">
+                <section class="card controls">
+                    <h2>Detection Controls</h2>
+                    <label>
+                        <span>Backend</span>
+                        <select id="stream-backend">
+                            {% for item in stream_backends %}
+                                <option value="{{ item }}" {% if item == default_values.backend %}selected{% endif %}>{{ item|upper }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>
+                        <span>Device</span>
+                        <select id="device">
+                            {% for item in device_choices %}
+                                <option value="{{ item }}" {% if item == default_values.device %}selected{% endif %}>{{ item }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>
+                        <span>Source</span>
+                        <input type="text" id="source" value="{{ default_values.source }}">
+                    </label>
+                    <label>
+                        <span>Model</span>
+                        <input type="text" id="stream-model" value="{{ default_values.model }}">
+                    </label>
+                    <label>
+                        <span>Confidence</span>
+                        <input type="number" id="stream-conf" value="{{ default_values.conf }}" min="0.05" max="0.99" step="0.05">
+                    </label>
+                    <div class="button-row">
+                        <button type="button" id="start-stream-btn">Start</button>
+                        <button type="button" id="stop-stream-btn" class="ghost-btn">Stop</button>
+                    </div>
+                </section>
+
+                <section class="card preset-card">
+                    <h2>Quick Presets</h2>
+                    <div class="preset-grid">
+                        <button type="button" class="preset-btn" data-backend="yolo" data-model="yolov8n.pt" data-conf="0.40">YOLO Default</button>
+                        <button type="button" class="preset-btn" data-backend="onnx" data-model="runs/detect/results/yolo_train/full_eval_20260326_143242/weights/best.onnx" data-conf="0.35">ONNX Fast</button>
+                        <button type="button" class="preset-btn" data-backend="ssd" data-model="ssd" data-conf="0.50">SSD Baseline</button>
+                    </div>
+                </section>
+
+                <section class="card info-card">
+                    <h2>How It Works</h2>
+                    <ul>
+                        <li>Select backend and camera source.</li>
+                        <li>Press Start and wait a few seconds for model loading.</li>
+                        <li>Session expires automatically after 10 minutes.</li>
+                    </ul>
+                </section>
+            </aside>
+
+            <section class="stream-card">
+                <div class="stream-top">
+                    <span id="stream-status" class="status-pill">Idle</span>
+                </div>
+                <img id="stream-frame" alt="Live stream will appear here." />
+                <div id="stream-empty" class="stream-empty">
+                    <h3>Camera Preview</h3>
+                    <p>Press Start and wait a few seconds for detection to begin.</p>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <footer class="copyright">
+        Edge Object Detection | &copy; Shivam Sengar. All rights reserved.
+    </footer>
+
+    <script src="{% static 'detector_web/app.js' %}"></script>
+</body>
+</html>

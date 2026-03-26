@@ -1,0 +1,46 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edge Object Detection | Login</title>
+    <link rel="stylesheet" href="{% static 'detector_web/style.css' %}">
+</head>
+<body class="auth-shell">
+    <main class="auth-layout">
+        <section class="auth-panel">
+            <p class="brand-name">Edge Object Detection</p>
+            <h1>Welcome Back</h1>
+            <p class="auth-desc">Run real-time webcam detection with YOLO, ONNX, and SSD. It can detect bottle, cup, and cell phone from your trained model, plus common COCO objects in SSD mode.</p>
+            <ul class="auth-points">
+                <li>In-browser live preview</li>
+                <li>Multiple backend support</li>
+                <li>Press Start and wait a few seconds for model loading</li>
+                <li>Auto logout after 10 minutes</li>
+            </ul>
+        </section>
+        <section class="auth-card">
+            <h2>Sign In</h2>
+            <form method="post" class="auth-form">
+                {% csrf_token %}
+                {% for field in form %}
+                    <label>
+                        <span>{{ field.label }}</span>
+                        {{ field }}
+                        {% if field.errors %}
+                            <small class="error">{{ field.errors|striptags }}</small>
+                        {% endif %}
+                    </label>
+                {% endfor %}
+                {% if form.non_field_errors %}
+                    <small class="error">{{ form.non_field_errors|striptags }}</small>
+                {% endif %}
+                <button type="submit">Sign In</button>
+            </form>
+            <p class="auth-link">No account? <a href="/register/">Register</a></p>
+        </section>
+    </main>
+    <footer class="copyright">Edge Object Detection | &copy; Shivam Sengar. All rights reserved.</footer>
+</body>
+</html>

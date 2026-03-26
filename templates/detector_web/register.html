@@ -1,0 +1,46 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edge Object Detection | Register</title>
+    <link rel="stylesheet" href="{% static 'detector_web/style.css' %}">
+</head>
+<body class="auth-shell">
+    <main class="auth-layout">
+        <section class="auth-panel">
+            <p class="brand-name">Edge Object Detection</p>
+            <h1>Create Account</h1>
+            <p class="auth-desc">Create an account to run live camera detection. The app can detect bottle, cup, and cell phone from your trained setup, and COCO objects when using SSD mode.</p>
+            <ul class="auth-points">
+                <li>Quick account setup</li>
+                <li>Protected user access</li>
+                <li>Press Start and wait a few seconds for detection to begin</li>
+                <li>Session countdown visibility</li>
+            </ul>
+        </section>
+        <section class="auth-card">
+            <h2>Register</h2>
+            <form method="post" class="auth-form">
+                {% csrf_token %}
+                {% for field in form %}
+                    <label>
+                        <span>{{ field.label }}</span>
+                        {{ field }}
+                        {% if field.errors %}
+                            <small class="error">{{ field.errors|striptags }}</small>
+                        {% endif %}
+                    </label>
+                {% endfor %}
+                {% if form.non_field_errors %}
+                    <small class="error">{{ form.non_field_errors|striptags }}</small>
+                {% endif %}
+                <button type="submit">Create Account</button>
+            </form>
+            <p class="auth-link">Already have an account? <a href="/login/">Login</a></p>
+        </section>
+    </main>
+    <footer class="copyright">Edge Object Detection | &copy; Shivam Sengar. All rights reserved.</footer>
+</body>
+</html>
